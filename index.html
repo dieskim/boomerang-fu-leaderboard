@@ -1,0 +1,538 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Boomerang Fu — Spicy vs Chill Leaderboard</title>
+<style>
+  :root {
+    --bg: #1f1f1f;
+    --text: #f3f4f6;
+    --card: #2a2a2a;
+    --muted: #9ca3af;
+    --accent: #ffd34d;
+    --spicy: #ff7a59;  /* softened orange-red */
+    --chill: #6fb8ff;  /* softened sky blue */
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji","Segoe UI Emoji";
+    background: #f0f4f8;
+    color: #111111;;
+  }
+  header {
+    text-align: center;
+    padding: 5px 16px 8px;
+  }
+  h1 { margin: 0 0 8px; font-size: 28px; }
+  .sub { color: var(--muted); font-size: 14px; }
+  .wrap { max-width: 1100px; margin: 0 auto; padding: 0 16px; }
+
+  /* Controls */
+  .controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;               /* spacing between buttons */
+  justify-content: center;
+    }
+    .controls .group {
+    display: flex;
+    gap: 12px;
+    margin: 0 20px;          /* bigger gap between the two groups */
+    }
+  .btn {
+    border: 0; border-radius: 10px; padding: 10px 14px; cursor: pointer; font-weight: 600;
+    background: #3a3a3a; color: var(--text); transition: transform .06s ease, opacity .2s;
+  }
+  .btn:active { transform: translateY(1px); }
+  .btn.primary { background: linear-gradient(135deg, #ff934d, #ff6b3d); }
+  .btn.cool { background: linear-gradient(135deg, #7fc9ff, #55b1ff); }
+  .btn.warn { background: linear-gradient(135deg, #ffcf3f, #ffb703); color: #222; }
+  .hint { text-align: center; color: var(--muted); font-size: 12px; margin-top: 6px; }
+
+  /* One-column main grid (leaderboard on top, matches below) */
+  .card {
+    background: var(--card); border-radius: 16px; padding: 16px;
+    box-shadow: 0 8px 24px rgba(0,0,0,.25);
+    margin-top: 16px;
+  }
+  .card h2 { margin: 0 0 12px; font-size: 18px; }
+
+  /* Matches */
+  .matches { display: flex; flex-direction: column; gap: 14px; margin: 16px 0; }
+  .match {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 14px;
+    align-items: stretch;
+  }
+  @media (max-width: 640px) {
+    .match { grid-template-columns: 1fr; }
+  }
+  .team {
+    border-radius: 16px; padding: 10px 16px; position: relative; overflow: hidden;
+    color: #111; font-weight: 700; text-align: center;
+    box-shadow: 0 8px 24px rgba(0,0,0,.25);
+  }
+  .team h3 { margin: 0 0 8px; font-size: 18px; color: #111; }
+  /* Make player names stand out */
+.team p {
+  font-size: 20px;
+  font-weight: 800;
+  background: rgba(255,255,255,0.92);
+  padding: 6px 12px;
+  border-radius: 12px;
+  box-shadow: 0 2px 6px rgba(0,0,0,.12);
+  margin: 10px 0;
+}
+/* Loser: clearly disabled */
+.team.disabled {
+  opacity: 0.35;
+  pointer-events: none;
+}
+.team.disabled p {
+  background: rgba(200,200,200,0.45);
+  color: #666;
+}
+
+/* Winner locked state (names fade with box) */
+.team.winner-locked p {
+  opacity: 0.7;                  /* match overall dim */
+  background: rgba(255, 255, 255, 0.75); /* soften pill */
+  color: #333;                   /* slightly muted text */
+}
+/* Optional: loser pill extra dull */
+.team.loser p {
+  filter: grayscale(0.2);
+  box-shadow: 0 1px 3px rgba(0,0,0,.08);
+}
+
+  .team.spicy { background: linear-gradient(160deg, var(--spicy), #ff9f84); }
+  .team.chill  { background: linear-gradient(160deg, var(--chill),  #9ed0ff); }
+
+  .team .win-btn {
+    width: 100%; border: 0; border-radius: 8px; padding: 8px 10px; cursor: pointer;
+    font-size: 20px;
+    font-weight: 800;
+    background: rgba(166, 232, 187, 0.85); color: #111;
+    transition: transform .06s ease, filter .2s;
+  }
+  .team .win-btn:active { transform: translateY(1px); }
+  .team .win-btn:hover  { filter: brightness(1.03); }
+
+  button.win-btn:disabled {
+    background: rgba(200,200,200,0.5) !important;
+    color: #555 !important;
+  }
+
+  #genBtn {
+  font-size: 20px;     /* bigger text */
+  padding: 14px 22px;  /* a little taller/wider */
+}
+
+  /* Winner glow */
+  .winner { animation: glow 1s ease-in-out infinite alternate; }
+  @keyframes glow {
+    from { box-shadow: 0 0 18px rgba(70, 255, 70, 0.7); }
+    to   { box-shadow: 0 0 36px rgb(2, 190, 58); }
+  }
+
+  /* Default Victory Banner */
+    .banner {
+    position: fixed; inset: 0; display: none; place-items: center; z-index: 50;
+    backdrop-filter: blur(2px);
+    }
+
+    .banner .content {
+    border-radius: 18px; padding: 20px; text-align: center;
+    box-shadow: 0 20px 60px rgba(0,0,0,.45);
+    transform: scale(.9); opacity: 0; animation: pop .35s forwards;
+    font-weight: bold;
+    }
+
+    .banner.spicy .content {
+    background: linear-gradient(45deg, #ff5c33, #ff3300);
+    color: white;
+    }
+
+    .banner.chill .content {
+    background: linear-gradient(45deg, #4da6ff, #1a75ff);
+    color: white;
+    }
+
+    .banner h4 { margin: 0 0 6px; font-size: 32px; }
+    .banner p { margin: 0; font-size: 20px; }
+  @keyframes pop { to { transform: scale(1); opacity: 1; } }
+
+  /* Leaderboard */
+  table { width: 100%; border-collapse: collapse; overflow: hidden; border-radius: 12px; }
+  thead th {
+    background: #303030; color: var(--text); padding: 10px; text-align: left; font-size: 14px;
+  }
+  tbody td {
+    border-top: 1px solid #333; padding: 10px; font-size: 15px;
+  }
+  tbody tr:nth-child(odd) { background: #262626; }
+  .right { text-align: right; }
+
+  .leaderboard-card {
+ width: 100%;               /* take full width */
+  margin: 16px 0;            /* spacing around */
+  padding: 12px;
+  border-radius: 16px;
+  background: linear-gradient(180deg, #ffe066, #ffd43b); /* bright yellow */
+  box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+  color: #222;  /* dark text for contrast */
+}
+
+.leaderboard-card h2 {
+  font-size: 16px;
+  margin-bottom: 6px;
+  color: #222; /* title dark */
+}
+
+.leaderboard-card table {
+  font-size: 14px;
+  background: rgba(255, 255, 255, 0.6); /* subtle overlay */
+  border-radius: 8px;
+}
+
+.leaderboard-card thead th {
+  background: #ffd43b;
+  color: #222;
+}
+
+.leaderboard-card tbody tr:nth-child(odd) {
+  background: rgba(255, 255, 255, 0.5);
+}
+
+
+
+  /* Players Modal (hidden page) */
+  .modal {
+    position: fixed; inset: 0; display: none; place-items: center; z-index: 60;
+    background: rgba(0,0,0,.45);
+  }
+  .modal.open { display: grid; }
+  .sheet {
+    width: min(720px, 92vw); max-height: 86vh; overflow: auto;
+    background: linear-gradient(180deg, #ffe066, #ffd43b); /* yellow gradient like leaderboard */
+    border-radius: 16px; padding: 16px;
+    box-shadow: 0 20px 60px rgba(0,0,0,.25);
+    animation: pop .25s ease-out forwards;
+    color: #222; /* dark text for readability */
+    }
+  .sheet h2 { margin: 0 0 10px; font-size: 20px; }
+  .sheet textarea {
+  width: 100%; min-height: 220px; resize: vertical;
+  border-radius: 12px; border: 1px solid #d4a017; 
+  background: #fff9e6; /* pale yellow background */
+  color: #222;
+  padding: 10px 12px; font-family: inherit;
+}
+  .sheet .row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+  .sheet .spacer { flex: 1; }
+  .close-x {
+    position: absolute; right: 14px; top: 12px; font-weight: 800; cursor: pointer; color: var(--muted);
+  }
+</style>
+</head>
+<body>
+  <header>
+    <img src="boomerang_fu_header.png" alt="Boomerang Fu" style="width: 90%; height: auto; border-radius: 12px;">
+    <div class="sub">Generate random 2v2 matches, record wins, and track the live leaderboard.</div>
+  </header>
+  <div class="wrap">
+    <!-- Matches -->
+    <section class="matches" id="matches"></section>
+
+    <!-- Generate Round under matches -->
+    <div class="controls">
+    <div class="group">
+        <button class="btn primary" id="genBtn">⚔️ Start Next Round</button>
+    </div>
+    </div>
+
+   <!-- Leaderboard (below) -->
+    <section class="card leaderboard-card">
+    <h2>Leaderboard</h2>
+    <table>
+        <thead>
+        <tr><th>#</th><th>Player</th><th class="right">Score</th></tr>
+        </thead>
+        <tbody id="boardBody"></tbody>
+    </table>
+    </section>
+
+    <!-- Other controls under leaderboard -->
+    <div class="controls">
+    <div class="group">
+        <button class="btn warn" id="clearMatchesBtn">🧹 Clear Matches</button>
+        <button class="btn" id="resetScoresBtn">🔄 Reset Scores</button>
+        <button class="btn cool" id="editPlayersBtn">✏️ Edit Players</button>
+    </div>
+    </div>
+    <div class="hint">Players & scores save to this browser. Use “Edit Players” to change names.</div>
+  </div>
+
+  <!-- Victory Banner -->
+  <div class="banner" id="banner">
+    <div class="content">
+      <h4 id="bannerTitle">VICTORY!</h4>
+      <p id="bannerText">Team Spicy Wins 🎉</p>
+    </div>
+  </div>
+
+  <!-- Players Modal -->
+  <div class="modal" id="playersModal" aria-hidden="true">
+    <div class="sheet">
+      <div class="close-x" id="closeModalBtn">✖</div>
+      <h2>Players (one per line)</h2>
+      <textarea id="playersBox" placeholder="One name per line"></textarea>
+      <div class="row">
+        <button class="btn primary" id="savePlayersBtn">💾 Save</button>
+        <button class="btn" id="useDefaultBtn">↩️ Reset to Default</button>
+        <div class="spacer"></div>
+        <button class="btn" id="shareLinkBtn">🔗 Copy Share Link</button>
+      </div>
+      <div class="hint">Tip: Saving will keep scores for existing names; new names start at 0.</div>
+    </div>
+  </div>
+
+<script>
+  // ===== State & Defaults =====
+  const DEFAULT_PLAYERS = [
+    "Player1","Player2","Player3","Player4","Player5","Player6",
+    "Player7","Player8","Player9","Player10","Player11","Player12"
+  ];
+  let players = [];
+  let scores = {};            // { name: number }
+  let matches = [];           // [{ spicy: [a,b], chill:[c,d] }, ...]
+  const LS_KEY_PLAYERS = "bf_players";
+  const LS_KEY_SCORES  = "bf_scores";
+
+  // ===== Helpers =====
+  const byId = (id) => document.getElementById(id);
+  const shuffle = (arr) => arr.map(v=>[Math.random(), v])
+                              .sort((a,b)=>a[0]-b[0]).map(x=>x[1]);
+  const chunk4 = (arr) => {
+    const out=[]; for(let i=0;i+3<arr.length;i+=4){ out.push(arr.slice(i,i+4)); }
+    return out;
+  };
+
+  function setPlayers(list) {
+    players = list.filter(Boolean);
+    const newScores = {};
+    players.forEach(p => newScores[p] = scores[p] ?? 0);
+    scores = newScores;
+    saveState();
+  }
+
+  function saveState() {
+    localStorage.setItem(LS_KEY_PLAYERS, JSON.stringify(players));
+    localStorage.setItem(LS_KEY_SCORES, JSON.stringify(scores));
+    renderPlayersBox();
+    renderBoard();
+  }
+
+  function loadState() {
+    // URL ?players=Zach,Zannah,...
+    const url = new URL(location.href);
+    const pParam = url.searchParams.get("players");
+    if (pParam) {
+      const fromUrl = pParam.split(",").map(s=>s.trim()).filter(Boolean);
+      setPlayers(fromUrl.length ? fromUrl : DEFAULT_PLAYERS);
+      scores = {}; players.forEach(p=>scores[p]=0);
+      saveState();
+      return;
+    }
+
+    const savedPlayers = JSON.parse(localStorage.getItem(LS_KEY_PLAYERS) || "[]");
+    const savedScores  = JSON.parse(localStorage.getItem(LS_KEY_SCORES)  || "{}");
+    if (savedPlayers.length) {
+      players = savedPlayers;
+      scores = savedScores;
+    } else {
+      players = [...DEFAULT_PLAYERS];
+      scores  = {}; players.forEach(p=>scores[p]=0);
+    }
+    renderPlayersBox();
+    renderBoard();
+  }
+
+  // ===== Rendering =====
+  function renderPlayersBox() {
+    const box = byId("playersBox");
+    if (box) box.value = players.join("\n");
+  }
+
+  function renderBoard() {
+    const tbody = byId("boardBody");
+    const rows = Object.entries(scores)
+      .sort((a,b)=> b[1]-a[1] || a[0].localeCompare(b[0]))
+      .map(( [name,score], i ) =>
+        `<tr><td>${i+1}</td><td>${name}</td><td class="right">${score}</td></tr>`
+      ).join("");
+    tbody.innerHTML = rows || `<tr><td colspan="3" class="right">No players</td></tr>`;
+  }
+
+  function renderMatches() {
+    const root = byId("matches");
+    root.innerHTML = matches.map((m, idx) => {
+      return `
+        <div class="match" data-match="${idx}">
+          <div class="team spicy">
+            <h3>🔥 Team Spicy</h3>
+            <p>${m.spicy[0]} &amp; ${m.spicy[1]}</p>
+            <button class="win-btn" onclick="win(${idx}, 'spicy')">🔥 Spicy Wins</button>
+          </div>
+          <div class="team chill">
+            <h3>❄️ Team Chill</h3>
+            <p>${m.chill[0]} &amp; ${m.chill[1]}</p>
+            <button class="win-btn" onclick="win(${idx}, 'chill')">❄️ Chill Wins</button>
+          </div>
+        </div>
+      `;
+    }).join("");
+  }
+
+  // ===== Actions =====
+  function generateRound() {
+    if (players.length < 4) {
+      alert("Need at least 4 players.");
+      return;
+    }
+    const order = shuffle([...players]);
+    const groups = chunk4(order);
+    matches = groups.map(g => ({ spicy: [g[0], g[1]], chill: [g[2], g[3]] }));
+    renderMatches();
+    document.querySelectorAll(".team").forEach(el => el.classList.remove("winner"));
+  }
+
+  function win(matchIndex, team) {
+    const m = matches[matchIndex];
+    if (!m) return;
+
+    const winners = team === "spicy" ? m.spicy : m.chill;
+    winners.forEach(name => scores[name] = (scores[name] || 0) + 1);
+    saveState();
+    highlightWinner(matchIndex, team);
+    showBanner(team);
+
+    // 🔒 Disable both buttons for this match after a win
+    const matchEl = document.querySelector(`.match[data-match="${matchIndex}"]`);
+    matchEl.querySelectorAll("button.win-btn").forEach(btn => {
+    btn.disabled = true;
+    btn.style.opacity = "0.65";
+    btn.style.cursor = "not-allowed";
+    });
+
+    // winner stays bright(ish), loser is clearly dim
+    const winnerEl = matchEl.querySelector(`.team.${team}`);
+    const loserEl  = matchEl.querySelector(`.team.${team === "spicy" ? "chill" : "spicy"}`);
+
+    winnerEl.classList.add("winner", "winner-locked");
+    loserEl.classList.add("disabled", "loser");
+
+ }
+
+
+  function resetScores() {
+    players.forEach(p => scores[p] = 0);
+    saveState();
+  }
+
+  function clearMatches() {
+    matches = [];
+    byId("matches").innerHTML = "";
+  }
+
+  function savePlayersFromBox() {
+    const list = byId("playersBox").value.split("\n").map(s=>s.trim());
+    setPlayers(list);
+    clearMatches(); // teams likely changed
+    closePlayersModal();
+  }
+
+  function useDefaultPlayers() {
+    setPlayers([...DEFAULT_PLAYERS]);
+    clearMatches();
+    closePlayersModal();
+  }
+
+  function copyShareLink() {
+    const param = encodeURIComponent(players.join(","));
+    const url = `${location.origin}${location.pathname}?players=${param}`;
+    navigator.clipboard.writeText(url).then(()=>{
+      alert("Share link copied to clipboard!");
+    });
+  }
+
+  // ===== Effects / Banner =====
+    function highlightWinner(matchIndex, team) {
+    const sel = `.match[data-match="${matchIndex}"] .team.${team}`;
+    const el = document.querySelector(sel);
+    if (el) el.classList.add("winner"); // don't remove from others
+    }
+
+    function showBanner(team) {
+    const banner = byId("banner");
+    const title = byId("bannerTitle");
+    const text = byId("bannerText");
+
+    // Reset classes
+    banner.classList.remove("spicy", "chill");
+
+    if (team === "spicy") {
+        banner.classList.add("spicy");
+        title.textContent = "🔥 Spicy Wins!";
+        text.textContent = "Spicy takes the victory";
+    } else {
+        banner.classList.add("chill");
+        title.textContent = "❄️ Chill Wins!";
+        text.textContent = "Chill takes the victory";
+    }
+
+    banner.style.display = "grid";
+    setTimeout(() => { banner.style.display = "none"; }, 2500);
+    }
+
+
+  // ===== Modal controls =====
+  const modal = byId("playersModal");
+  function openPlayersModal() {
+    renderPlayersBox();
+    modal.classList.add("open");
+    modal.setAttribute("aria-hidden","false");
+    // focus textarea after a tick
+    setTimeout(()=> byId("playersBox").focus(), 50);
+  }
+  function closePlayersModal() {
+    modal.classList.remove("open");
+    modal.setAttribute("aria-hidden","true");
+  }
+
+  // Close on backdrop click or ESC
+  modal.addEventListener("click", (e)=>{
+    if (e.target === modal) closePlayersModal();
+  });
+  document.addEventListener("keydown", (e)=>{
+    if (e.key === "Escape" && modal.classList.contains("open")) closePlayersModal();
+  });
+
+  // ===== Wire up =====
+  window.win = win; // expose for inline onclick
+  byId("genBtn").addEventListener("click", generateRound);
+  byId("resetScoresBtn").addEventListener("click", resetScores);
+  byId("clearMatchesBtn").addEventListener("click", clearMatches);
+
+  byId("editPlayersBtn").addEventListener("click", openPlayersModal);
+  byId("closeModalBtn").addEventListener("click", closePlayersModal);
+  byId("savePlayersBtn").addEventListener("click", savePlayersFromBox);
+  byId("useDefaultBtn").addEventListener("click", useDefaultPlayers);
+  byId("shareLinkBtn").addEventListener("click", copyShareLink);
+
+  loadState();   // init players & scores
+  generateRound(); // first round
+</script>
+</body>
+</html>
